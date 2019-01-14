@@ -1,8 +1,9 @@
-# A Little Scheme in Python 2.7 & 3.7
+# A Little Scheme in Python
 
-This is a small interpreter of a subset of Scheme.
+This is a small (~300 lines) interpreter of a subset of Scheme.
 It runs on both Python 2.7 and Python 3.7.
-
+As a Scheme implementation, 
+it optimizes _tail calls_ and handles _first-class continuations_ properly.
 
 
 ## How to use
@@ -62,6 +63,21 @@ $ ./scm.py examples/fib15.scm -
 > 
 ```
 
+
+## Examples
+
+There are three files under the `examples` folder.
+
+- [`fib15.scm`](examples/fib15.scm)
+  calculates Fibonacci for 15.
+
+- [`nqueens.scm`](examples/nqueens.scm)
+  runs an N-Queens solver for 6.
+
+- [`yin-yang-puzzle.scm`](examples/yin-yang-puzzle.scm)
+  runs the Yin-Yang puzzle with `call/cc`.
+
+
 ## The implemented language
 
 This Scheme does not have strings.
@@ -76,9 +92,8 @@ This Scheme does not have strings.
 | pairs `(1 . 2)`, `(x y z)`          | `class Cell (List)`                   |
 | closures `(lambda (x) (+ x 1))`     | `class Closure`                       |
 
-
-_For now_ it does _not_ optimize tail calls _nor_ handle
-first-class continuations.
+The continuation which `call/cc` gives to its argument is represented by
+a Python tuple (_operation_, _value_, _environment_, _next continuation_).
 
 
 ### Expression types
@@ -106,7 +121,7 @@ an expression type and it defines _v_ as a varible at the top level
 wherever it is evaluated.
 
 
-## Built-in procedures
+### Built-in procedures
 
 - (`car` _lst_)
 
@@ -126,6 +141,10 @@ wherever it is evaluated.
 
 - (`list` _x_ ...)
 
+- (`call/cc` _fun_)
+
+- (`apply` _fun_ _arg_)
+
 - (`display` _x_)
 
 - (`newline`)
@@ -140,4 +159,8 @@ wherever it is evaluated.
 
 - (`=` _x_ _y_)
 
-See `GLOBAL_ENV` in `scm.py` for the implementation of the procedures.
+See `GLOBAL_ENV` in `scm.py` for the implementation of the procedures
+except `call/cc` and `apply`.  
+`call/cc` and `apply` are implemented in `apply_function` in `scm.py`.
+
+I hope it serves as a model of _how to write a Scheme interpreter in Python_.

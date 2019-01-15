@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
- A little Scheme in Python 2.7 & 3.7  H31.1/13 - H31.1/14 by SUZUKI Hisao
+ A little Scheme in Python 2.7 & 3.7  H31.1/13 - H31.1/15 by SUZUKI Hisao
 """
 from __future__ import print_function
 from types import FunctionType
@@ -75,6 +75,15 @@ def stringify(exp):
         b = stringify(exp.body)
         e = '()' if exp.env is NIL else '#' + hex(hash(exp.env))
         return '#<' + p + ':' + b + ':' + e + '>'
+    elif exp is NOCONT:
+        return '#<NOCONT>'
+    elif isinstance(exp, tuple) and len(exp) == 4:
+        op, val, env, cont = exp
+        p = stringify(op)
+        v = stringify(val)
+        e = '()' if env is NIL else '#' + hex(hash(env))
+        k = stringify(cont)
+        return '#<' + p + ':' + v + ':' + e + ':\n ' + k + '>'
     else:
         return str(exp)
 
@@ -155,8 +164,8 @@ def apply_cont(cont, exp):
         else:
             return (x.car, env, (BEGIN, x.cdr, env, k))
     elif op is DEFINE:          # x = v
-        GLOBAL_ENV.cdr = Cell(GLOBAL_ENV.car, GLOBAL_ENV.cdr)
-        GLOBAL_ENV.car = Cell(x, exp)
+        env.cdr = Cell(env.car, env.cdr)
+        env.car = Cell(x, exp)
         return (None, None, k)
     elif op is SETQ:            # x = (v . e)
         x.cdr = exp
@@ -169,7 +178,7 @@ def apply_cont(cont, exp):
         else:
             return (args.car, env, (APPLY, Cell(args.cdr, evaled), env, k))
     else:
-        raise ValueError(('continuation', cont))
+        raise ValueError((cont, exp))
 
 def apply_function(fun, arg, k):
     """Apply a function to arguments with a continuation.
@@ -204,8 +213,7 @@ def _look_for_pair(key, alist):
     for pair in alist:
         if pair.car is key:
             return pair
-    else:
-        raise NameError(key)
+    raise NameError(key)
 
 def _pair_keys_and_data_on_alist(keys, data, alist):
     "_pair_keys_and_data_on_alist((a b), (1 2), x) => ((a . 1) (b . 2) . x)"

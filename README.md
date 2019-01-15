@@ -1,6 +1,6 @@
 # A Little Scheme in Python
 
-This is a small (~300 lines) interpreter of a subset of Scheme.
+This is a small (300 lines) interpreter of a subset of Scheme.
 It runs on both Python 2.7 and Python 3.7.
 As a Scheme implementation, 
 it optimizes _tail calls_ and handles _first-class continuations_ properly.
@@ -75,7 +75,43 @@ There are three files under the `examples` folder.
   runs an N-Queens solver for 6.
 
 - [`yin-yang-puzzle.scm`](examples/yin-yang-puzzle.scm)
-  runs the Yin-Yang puzzle with `call/cc`.
+  runs the yin-yang puzzle with `call/cc`.
+
+```
+$ ./scm.py examples/nqueens.scm
+((5 3 1 6 4 2) (4 1 5 2 6 3) (3 6 2 5 1 4) (2 4 6 1 3 5))
+$ cat examples/yin-yang-puzzle.scm
+;; The yin-yang puzzle 
+;; cf. https://en.wikipedia.org/wiki/Call-with-current-continuation
+
+((lambda (yin)
+   ((lambda (yang)
+      (yin yang))
+    ((lambda (cc)
+       (display '*)
+       cc)
+     (call/cc (lambda (c) c)))))
+ ((lambda (cc)
+    (newline)
+    cc)
+  (call/cc (lambda (c) c))))
+
+;; => \n*\n**\n***\n****\n*****\n******\n...
+$ ./scm.py examples/yin-yang-puzzle.scm
+
+*
+**
+***
+****
+*****
+******
+*******
+********
+*********
+**********
+```
+
+Press the interrupt key (e.g. Control-C) to stop the yin-yang puzzle.
 
 
 ## The implemented language
@@ -92,8 +128,9 @@ This Scheme does not have strings.
 | pairs `(1 . 2)`, `(x y z)`          | `class Cell (List)`                   |
 | closures `(lambda (x) (+ x 1))`     | `class Closure`                       |
 
-The continuation which `call/cc` gives to its argument is represented by
-a Python tuple (_operation_, _value_, _environment_, _next continuation_).
+Continuations are represented by Python tuples of the form
+(_operation_, _value_, _environment_, _next continuation_)
+and will be passed by `call/cc` to its argument.
 
 
 ### Expression types
@@ -116,9 +153,7 @@ a Python tuple (_operation_, _value_, _environment_, _next continuation_).
 
 - (`define` _v_ _e_)
 
-For the sake of simplicity, this Scheme treats (`define` _v_ _e_) as
-an expression type and it defines _v_ as a varible at the top level 
-wherever it is evaluated.
+For simplicity, this Scheme treats (`define` _v_ _e_) as an expression type.
 
 
 ### Built-in procedures
@@ -159,8 +194,11 @@ wherever it is evaluated.
 
 - (`=` _x_ _y_)
 
-See `GLOBAL_ENV` in `scm.py` for the implementation of the procedures
+See [`GLOBAL_ENV`](scm.py#L91-L112)
+in `scm.py` for the implementation of the procedures
 except `call/cc` and `apply`.  
-`call/cc` and `apply` are implemented in `apply_function` in `scm.py`.
+`call/cc` and `apply` are implemented at 
+[`apply_function`](scm.py#L183-L202) in `scm.py`.
 
-I hope it serves as a model of _how to write a Scheme interpreter in Python_.
+I hope `scm.py` serves as a popular model of
+how to write a Scheme interpreter in Python.

@@ -1,21 +1,19 @@
 ;; N-Queens solver in Scheme
 (define nqueens
   (lambda (n)
-    ((lambda (loop)
-       (set! loop
-             (lambda (lst result)
-               (if (null? lst)
-                   result
-                 ((lambda (candidate)
-                    (set! lst (cdr lst))
-                    (if (safe-positions? candidate)
-                        (if (= (_length candidate) n)
-                            (set! result (cons candidate result))
-                          (set! lst (_append (cons-range n candidate) lst))))
-                    (loop lst result))
-                  (car lst)))))
-       (loop (cons-range n '()) '()))
-     '())))
+    (define loop
+      (lambda (lst result)
+        (if (null? lst)
+            result
+          ((lambda (candidate)
+             (set! lst (cdr lst))
+             (if (safe-positions? candidate)
+                 (if (= (_length candidate) n)
+                     (set! result (cons candidate result))
+                   (set! lst (_append (cons-range n candidate) lst))))
+             (loop lst result))
+           (car lst)))))
+    (loop (cons-range n '()) '())))
 
 (define _length
   (lambda (lst)

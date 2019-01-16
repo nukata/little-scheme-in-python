@@ -66,7 +66,7 @@ $ ./scm.py examples/fib15.scm -
 
 ## Examples
 
-There are three files under the `examples` folder.
+There are four files under the `examples` folder.
 
 - [`fib15.scm`](examples/fib15.scm)
   calculates Fibonacci for 15.
@@ -74,12 +74,17 @@ There are three files under the `examples` folder.
 - [`nqueens.scm`](examples/nqueens.scm)
   runs an N-Queens solver for 6.
 
+- [`dynamic-wind-example.scm`](examples/dynamic-wind-example.scm)
+  demonstrates the example of `dynamic-wind` in R5RS.
+
 - [`yin-yang-puzzle.scm`](examples/yin-yang-puzzle.scm)
   runs the yin-yang puzzle with `call/cc`.
 
 ```
 $ ./scm.py examples/nqueens.scm
 ((5 3 1 6 4 2) (4 1 5 2 6 3) (3 6 2 5 1 4) (2 4 6 1 3 5))
+$ ./scm.py examples/dynamic-wind-example.scm 
+(connect talk1 disconnect connect talk2 disconnect)
 $ cat examples/yin-yang-puzzle.scm
 ;; The yin-yang puzzle 
 ;; cf. https://en.wikipedia.org/wiki/Call-with-current-continuation

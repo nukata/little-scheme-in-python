@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
- A little Scheme in Python 2.7 & 3.7  H31.1/13 - H31.1/15 by SUZUKI Hisao
+ A little Scheme in Python 2.7 & 3.7  H31.1/13 - H31.1/17 by SUZUKI Hisao
 """
 from __future__ import print_function
 from types import FunctionType
@@ -91,12 +91,14 @@ _ = Cell
 GLOBAL_ENV = (
     _(_(intern('display'), lambda x: print(stringify(x.car), end='')),
       _(_(intern('newline'), lambda x: print()),
-        _(_(intern('+'), lambda x: x.car + x.cdr.car),
-          _(_(intern('-'), lambda x: x.car - x.cdr.car),
-            _(_(intern('*'), lambda x: x.car * x.cdr.car),
-              _(_(intern('<'), lambda x: x.car < x.cdr.car),
-                _(_(intern('='), lambda x: x.car == x.cdr.car),
-                  NIL))))))))
+        _(_(intern('load'), lambda x: read_eval_print(open(x.car).read())),
+          _(_(intern('symbol->string'), lambda x: x.car),
+            _(_(intern('+'), lambda x: x.car + x.cdr.car),
+              _(_(intern('-'), lambda x: x.car - x.cdr.car),
+                _(_(intern('*'), lambda x: x.car * x.cdr.car),
+                  _(_(intern('<'), lambda x: x.car < x.cdr.car),
+                    _(_(intern('='), lambda x: x.car == x.cdr.car),
+                      NIL))))))))))
 GLOBAL_ENV = (
     _(_(intern('car'), lambda x: x.car.car),
       _(_(intern('cdr'), lambda x: x.car.cdr),
@@ -236,8 +238,6 @@ def read_from_tokens(tokens):
     """Read an expression from a list of token strings.
     The list will be left with the rest of token strings, if any.
     """
-    if not tokens:
-        raise SyntaxError('unexpected EOF')
     token = tokens.pop(0)
     if token == '(':
         y = z = Cell(NIL, NIL)

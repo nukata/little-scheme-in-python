@@ -163,47 +163,34 @@ For simplicity, this Scheme treats (`define` _v_ _e_) as an expression type.
 
 ### Built-in procedures
 
-- (`car` _lst_)
+|                      |                        |                          |
+|:---------------------|:-----------------------|:-------------------------|
+| (`car` _lst_)        | (`not` _x_)            | (`symbol->string` _sym_) |
+| (`cdr` _lst_)        | (`list` _x_ ...)       | (`+` _x_ _y_)            |
+| (`cons` _x_ _y_)     | (`call/cc` _fun_)      | (`-` _x_ _y_)            |
+| (`eq?` _x_ _y_)      | (`apply` _fun_ _arg_)  | (`*` _x_ _y_)            |
+| (`eqv?` _x_ _y_)     | (`display` _x_)        | (`<` _x_ _y_)            |
+| (`pair?` _x_)        | (`newline`)            | (`=` _x_ _y_)            |
+| (`null?` _x_)        | (`load` _sym_)         |                          |
+|                      |                        |                          |
 
-- (`cdr` _lst_)
-
-- (`cons` _x_ _y_)
-
-- (`eq?` _x_ _y_)
-
-- (`eqv?` _x_ _y_)
-
-- (`pair?` _x_)
-
-- (`null?` _x_)
-
-- (`not` _x_)
-
-- (`list` _x_ ...)
-
-- (`call/cc` _fun_)
-
-- (`apply` _fun_ _arg_)
-
-- (`display` _x_)
-
-- (`newline`)
-
-- (`+` _x_ _y_)
-
-- (`-` _x_ _y_)
-
-- (`*` _x_ _y_)
-
-- (`<` _x_ _y_)
-
-- (`=` _x_ _y_)
-
-See [`GLOBAL_ENV`](scm.py#L91-L112)
+See [`GLOBAL_ENV`](scm.py#L91-L114)
 in `scm.py` for the implementation of the procedures
 except `call/cc` and `apply`.  
 `call/cc` and `apply` are implemented at 
-[`apply_function`](scm.py#L183-L202) in `scm.py`.
+[`apply_function`](scm.py#L185-L204) in `scm.py`.
+
+Note that `load` takes a symbol as its argument and
+`symbol->string` is actually an identity function in this Scheme.
+If you write `(symbol->string 'foo/bar.baz)` instead of `"foo/bar.baz"`,
+your Scheme code will run both here and in other Schemes (e.g.
+[guile](https://www.gnu.org/software/guile/)).
+
+```
+> (load (symbol->string 'examples/fib15.scm))
+987
+> 
+```
 
 I hope `scm.py` serves as a popular model of
 how to write a Scheme interpreter in Python.

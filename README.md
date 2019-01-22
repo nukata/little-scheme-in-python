@@ -167,6 +167,7 @@ For simplicity, this Scheme treats (`define` _v_ _e_) as an expression type.
 
 ### Built-in procedures
 
+|                      |                        |                          |
 |:---------------------|:-----------------------|:-------------------------|
 | (`car` _lst_)        | (`not` _x_)            | (`symbol->string` _sym_) |
 | (`cdr` _lst_)        | (`list` _x_ ...)       | (`+` _x_ _y_)            |
@@ -175,6 +176,7 @@ For simplicity, this Scheme treats (`define` _v_ _e_) as an expression type.
 | (`eqv?` _x_ _y_)     | (`display` _x_)        | (`<` _x_ _y_)            |
 | (`pair?` _x_)        | (`newline`)            | (`=` _x_ _y_)            |
 | (`null?` _x_)        | (`load` _sym_)         |                          |
+|                      |                        |                          |
 
 See [`GLOBAL_ENV`](scm.py#L91-L114)
 in `scm.py` for the implementation of the procedures

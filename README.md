@@ -33,33 +33,37 @@ $
 You can run `scm.py` with a Scheme script.
 
 ```
-$ cat examples/fib15.scm
-(define fib
+$ cat examples/fib90.scm
+;; Fibonacci numbers: F(n) = F(n-1) + F(n-2) with F(0) = 0 and F(1) = 1. 
+;; cf. https://oeis.org/A000045
+(define fibonacci
   (lambda (n)
-    (if (< n 2)
-        1
-      (+ (fib (- n 1))
-         (fib (- n 2))))))
+    (define _fib
+      (lambda (i F_i F_i+1)
+        (if (= i n)
+            F_i
+          (_fib (+ i 1) F_i+1 (+ F_i F_i+1)))))
+    (_fib 0 0 1)))                      ; i=0, F(0)=0, F(1)=1
 
-(display (fib 15))
+(display (fibonacci 90))
 (newline)
-;; => 987
-$ ./scm.py examples/fib15.scm
-987
+;; => 2880067194370816120
+$ ./scm.py examples/fib90.scm
+2880067194370816120
 $ 
 ```
 
 Put a "`-`" after the script to begin a session after running it.
 
 ```
-$ ./scm.py examples/fib15.scm -
+$ ./scm.py examples/fib90.scm -
+2880067194370816120
+> (fibonacci 0)
+0
+> (fibonacci 1)
+1
+> (fibonacci 16)
 987
-> (fib 0)
-1
-> (fib 1)
-1
-> (fib 2)
-2
 > 
 ```
 
@@ -68,8 +72,8 @@ $ ./scm.py examples/fib15.scm -
 
 There are four files under the `examples` folder.
 
-- [`fib15.scm`](examples/fib15.scm)
-  calculates Fibonacci for 15.
+- [`fib90.scm`](examples/fib90.scm)
+  calculates Fibonacci for 90 tail-recursively.
 
 - [`nqueens.scm`](examples/nqueens.scm)
   runs an N-Queens solver for 6.
@@ -163,7 +167,6 @@ For simplicity, this Scheme treats (`define` _v_ _e_) as an expression type.
 
 ### Built-in procedures
 
-|                      |                        |                          |
 |:---------------------|:-----------------------|:-------------------------|
 | (`car` _lst_)        | (`not` _x_)            | (`symbol->string` _sym_) |
 | (`cdr` _lst_)        | (`list` _x_ ...)       | (`+` _x_ _y_)            |
@@ -172,7 +175,6 @@ For simplicity, this Scheme treats (`define` _v_ _e_) as an expression type.
 | (`eqv?` _x_ _y_)     | (`display` _x_)        | (`<` _x_ _y_)            |
 | (`pair?` _x_)        | (`newline`)            | (`=` _x_ _y_)            |
 | (`null?` _x_)        | (`load` _sym_)         |                          |
-|                      |                        |                          |
 
 See [`GLOBAL_ENV`](scm.py#L91-L114)
 in `scm.py` for the implementation of the procedures
@@ -187,8 +189,8 @@ your Scheme code will run both here and in other Schemes (e.g.
 [guile](https://www.gnu.org/software/guile/)).
 
 ```
-> (load (symbol->string 'examples/fib15.scm))
-987
+> (load (symbol->string 'examples/fib90.scm))
+2880067194370816120
 > 
 ```
 

@@ -1,6 +1,6 @@
 # A Little Scheme in Python
 
-This is a small (300 lines) interpreter of a subset of Scheme.
+This is a small (≈ 300 lines) interpreter of a subset of Scheme.
 It runs on both Python 2.7 and Python 3.7.
 As a Scheme implementation, 
 it optimizes _tail calls_ and handles _first-class continuations_ properly.
@@ -17,11 +17,14 @@ $ ./scm.py
 11
 > (cons 'a (cons 'b 'c))
 (a b . c)
+> (list
+| 1
+| 2
+| 3
+| )
+(1 2 3)
 > 
 ```
-
-Sorry, but each whole expression must be input in _a_ line
-on the session.  You cannot divide it into lines.
 
 Press EOF (e.g. Control-D) to exit the session.
 

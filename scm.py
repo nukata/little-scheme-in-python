@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
- A little Scheme in Python 2.7 & 3.7  H31.1/13 - H31.1/17 by SUZUKI Hisao
+A little Scheme in Python 2.7/3.7 v1.0 H31.01.13/H31.02.02 by SUZUKI Hisao
 """
 from __future__ import print_function
 from types import FunctionType
@@ -271,25 +271,42 @@ def read_from_tokens(tokens):
             except ValueError:
                 return intern(token) # as a symbol
 
+class IncompleteExpressionError (Exception):
+    pass
+
 def read_eval_print(source_string):
     "Read-eval-print a source string."
     result = None
     tokens = split_string_into_tokens(source_string)
     while tokens:
-        exp = read_from_tokens(tokens)
+        try:
+            exp = read_from_tokens(tokens)
+        except IndexError:      # tokens.pop(0) failed unexpectedly.
+            raise IncompleteExpressionError(source_string)
         result = evaluate(exp)
     if result is not None:
         print(stringify(result))
 
 def read_eval_print_loop():
     "Repeat read-eval-print until End-of-File."
+    initial = True
     while True:
         try:
-            source_string = raw_input('> ')
+            if initial:
+                source_string = raw_input('> ')
+            else:               # Add a continuation line.
+                source_string += '\n' + raw_input('| ')
+                initial = True
         except EOFError:
             print('Goodbye')
             return
-        read_eval_print(source_string)
+        try:
+            read_eval_print(source_string)
+        except IncompleteExpressionError as ex:
+            if ex.args[0] is source_string:
+                initial = False
+            else:
+                raise
 
 if __name__ == '__main__':
     if argv[1:2]:

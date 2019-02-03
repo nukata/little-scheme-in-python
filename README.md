@@ -143,7 +143,8 @@ This Scheme does not have strings.
 Continuations are represented by Python tuples of the form
 (_operation_, _value_, _environment_, _next continuation_)
 and will be passed by `call/cc` to its argument.
-
+See [`A-NOTE-TO-IMPLEMENT-CALL-CC.md`](A-NOTE-TO-IMPLEMENT-CALL-CC.md)
+for the implementation.
 
 ### Expression types
 

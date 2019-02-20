@@ -135,6 +135,7 @@ This Scheme does not have strings.
 | numbers `1`, `2.3`                  | `int` or `float`                      |
 | `#t`                                | `True`                                |
 | `#f`                                | `False`                               |
+| `#\space`                           | interned `" "`                        |
 | symbols `a`, `+`                    | interned `str`                        |
 | `()`                                | `NIL`, a singleton of `List()`        |
 | pairs `(1 . 2)`, `(x y z)`          | `class Cell (List)`                   |
@@ -145,6 +146,18 @@ Continuations are represented by Python tuples of the form
 and will be passed by `call/cc` to its argument.
 See [`A-NOTE-TO-IMPLEMENT-CALL-CC.md`](A-NOTE-TO-IMPLEMENT-CALL-CC.md)
 for the implementation.
+
+`#\space` is implemented as a self-evaluating symbol _expediently_;
+you shoud not make use of it.
+Just use `#\space` as if it were a character.
+
+```
+> (symbol? #\space)
+#t
+> (display 'a) (display #\space) (display 'b) (newline)
+a b
+> 
+```
 
 ### Expression types
 
@@ -171,22 +184,24 @@ For simplicity, this Scheme treats (`define` _v_ _e_) as an expression type.
 
 ### Built-in procedures
 
-|                      |                        |                          |
-|:---------------------|:-----------------------|:-------------------------|
-| (`car` _lst_)        | (`not` _x_)            | (`symbol->string` _sym_) |
-| (`cdr` _lst_)        | (`list` _x_ ...)       | (`+` _x_ _y_)            |
-| (`cons` _x_ _y_)     | (`call/cc` _fun_)      | (`-` _x_ _y_)            |
-| (`eq?` _x_ _y_)      | (`apply` _fun_ _arg_)  | (`*` _x_ _y_)            |
-| (`eqv?` _x_ _y_)     | (`display` _x_)        | (`<` _x_ _y_)            |
-| (`pair?` _x_)        | (`newline`)            | (`=` _x_ _y_)            |
-| (`null?` _x_)        | (`load` _sym_)         |                          |
-|                      |                        |                          |
+|                      |                          |                     |
+|:---------------------|:-------------------------|:--------------------|
+| (`car` _lst_)        | (`call/cc` _fun_)        | (`+` _x_ _y_)       |
+| (`cdr` _lst_)        | (`apply` _fun_ _arg_)    | (`-` _x_ _y_)       |
+| (`cons` _x_ _y_)     | (`display` _x_)          | (`*` _x_ _y_)       |
+| (`eq?` _x_ _y_)      | (`newline`)              | (`<` _x_ _y_)       |
+| (`eqv?` _x_ _y_)     | (`read`)                 | (`=` _x_ _y_)       |
+| (`pair?` _x_)        | (`eof-object?` _x_)      |                     |
+| (`null?` _x_)        | (`symbol?` _x_)          |                     |
+| (`not` _x_)          | (`symbol->string` _sym_) |                     |
+| (`list` _x_ ...)     | (`load` _sym_)           |                     |
+|                      |                          |                     |
 
-See [`GLOBAL_ENV`](scm.py#L91-L114)
+See [`GLOBAL_ENV`](scm.py#L92-L119)
 in `scm.py` for the implementation of the procedures
 except `call/cc` and `apply`.  
 `call/cc` and `apply` are implemented at 
-[`apply_function`](scm.py#L185-L204) in `scm.py`.
+[`apply_function`](scm.py#L190-L209) in `scm.py`.
 
 Note that `load` takes a symbol as its argument and
 `symbol->string` is actually an identity function in this Scheme.

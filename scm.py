@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-A little Scheme in Python 2.7/3.7 v1.0 H31.01.13/H31.02.02 by SUZUKI Hisao
+A little Scheme in Python 2.7/3.7 v1.1 H31.01.13/H31.02.20 by SUZUKI Hisao
 """
 from __future__ import print_function
 from types import FunctionType
@@ -29,6 +29,7 @@ DEFINE = intern('define')
 SETQ = intern('set!')
 APPLY = intern('apply')
 CALLCC = intern('call/cc')
+SPACE = intern(' ')             # To make #\space self-evaluating.
 
 class Cell (List):
     "Cons cell"
@@ -91,14 +92,18 @@ _ = Cell
 GLOBAL_ENV = (
     _(_(intern('display'), lambda x: print(stringify(x.car), end='')),
       _(_(intern('newline'), lambda x: print()),
-        _(_(intern('load'), lambda x: read_eval_print(open(x.car).read())),
-          _(_(intern('symbol->string'), lambda x: x.car),
-            _(_(intern('+'), lambda x: x.car + x.cdr.car),
-              _(_(intern('-'), lambda x: x.car - x.cdr.car),
-                _(_(intern('*'), lambda x: x.car * x.cdr.car),
-                  _(_(intern('<'), lambda x: x.car < x.cdr.car),
-                    _(_(intern('='), lambda x: x.car == x.cdr.car),
-                      NIL))))))))))
+        _(_(intern('read'), lambda x: read_expression('', '')),
+          _(_(intern('eof-object?'), lambda x: isinstance(x.car, EOFError)),
+            _(_(intern('symbol?'), lambda x: isinstance(x.car, str)),
+              _(_(intern('symbol->string'), lambda x: x.car),
+                _(_(intern('load'), lambda x: load(x.car)),
+                  _(_(intern('+'), lambda x: x.car + x.cdr.car),
+                    _(_(intern('-'), lambda x: x.car - x.cdr.car),
+                      _(_(intern('*'), lambda x: x.car * x.cdr.car),
+                        _(_(intern('<'), lambda x: x.car < x.cdr.car),
+                          _(_(intern('='), lambda x: x.car == x.cdr.car),
+                            _(_(SPACE, SPACE),
+                              NIL))))))))))))))
 GLOBAL_ENV = (
     _(_(intern('car'), lambda x: x.car.car),
       _(_(intern('cdr'), lambda x: x.car.cdr),
@@ -262,6 +267,8 @@ def read_from_tokens(tokens):
         return False
     elif token == '#t':
         return True
+    elif token == '#\space':
+        return SPACE
     else:
         try:
             return int(token)
@@ -271,47 +278,46 @@ def read_from_tokens(tokens):
             except ValueError:
                 return intern(token) # as a symbol
 
-class IncompleteExpressionError (Exception):
-    pass
-
-def read_eval_print(source_string):
-    "Read-eval-print a source string."
-    result = None
+def load(file_name):
+    "Load a source code from a file."
+    with open(file_name) as rf:
+        source_string = rf.read()
     tokens = split_string_into_tokens(source_string)
     while tokens:
+        exp = read_from_tokens(tokens)
+        evaluate(exp)
+
+TOKENS = []
+
+def read_expression(prompt1="> ", prompt2="| "):
+    "Read an expression."
+    while True:
+        old = TOKENS[:]
         try:
-            exp = read_from_tokens(tokens)
+            return read_from_tokens(TOKENS)
         except IndexError:      # tokens.pop(0) failed unexpectedly.
-            raise IncompleteExpressionError(source_string)
-        result = evaluate(exp)
-    if result is not None:
-        print(stringify(result))
+            try:
+                source_string = raw_input(prompt2 if old else prompt1)
+            except EOFError as ex:
+                del TOKENS[:]
+                return ex
+            TOKENS[:] = old
+            TOKENS.extend(split_string_into_tokens(source_string))
 
 def read_eval_print_loop():
     "Repeat read-eval-print until End-of-File."
-    initial = True
     while True:
-        try:
-            if initial:
-                source_string = raw_input('> ')
-            else:               # Add a continuation line.
-                source_string += '\n' + raw_input('| ')
-                initial = True
-        except EOFError:
+        exp = read_expression()
+        if isinstance(exp, EOFError):
             print('Goodbye')
             return
-        try:
-            read_eval_print(source_string)
-        except IncompleteExpressionError as ex:
-            if ex.args[0] is source_string:
-                initial = False
-            else:
-                raise
+        result = evaluate(exp)
+        if result is not None:
+            print(stringify(result))
 
 if __name__ == '__main__':
     if argv[1:2]:
-        source_string = open(argv[1]).read()
-        read_eval_print(source_string)
+        load(argv[1])
         if argv[2:3] != ['-']:
             exit(0)
     read_eval_print_loop()

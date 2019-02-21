@@ -79,9 +79,11 @@ The application function `apply_function` also has the `k` parameter.
 def apply_function(fun, arg, k):
     "Apply a function to arguments with a continuation."
     if fun is CALLCC:
-        return apply_function(arg.car, Cell(lambda x: k(x.car), NIL), k)
+        return apply_function(arg.car, Cell(Continuation(k), NIL), k)
     elif fun is APPLY:
         return apply_function(arg.car, arg.cdr.car, k)
+    elif isinstance(fun, Continuation):
+        return fun.cont(arg.car)
     elif isinstance(fun, FunctionType):
         return k(fun(arg))
     elif isinstance(fun, Closure):
@@ -91,7 +93,20 @@ def apply_function(fun, arg, k):
         raise ValueError((fun, arg))
 ```
 
-where `CALLCC` represents `call/cc` in Scheme and `APPLY` represents `apply` in Scheme.
+where `CALLCC` represents `call/cc` and `APPLY` represents `apply`.
+
+`Continuation` is defined as follows:
+
+```Python
+class Continuation:
+    "Continuation as an expression value"
+    def __init__(self, cont):
+        self.cont = cont
+
+    def __str__(self):
+        return '#<' + hex(hash(self.cont)) + '>'
+```
+
 `FunctionType` is imported from `types` as follows:
 
 ```Python

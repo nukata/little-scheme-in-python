@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-A little Scheme in Python 2.7/3.7 v1.1 H31.01.13/H31.02.20 by SUZUKI Hisao
+A little Scheme in Python 2.7/3.7 v2.0 H31.01.13/H31.02.23 by SUZUKI Hisao
 """
 from __future__ import print_function
 from types import FunctionType
@@ -29,7 +29,6 @@ DEFINE = intern('define')
 SETQ = intern('set!')
 APPLY = intern('apply')
 CALLCC = intern('call/cc')
-SPACE = intern(' ')             # To make #\space self-evaluating.
 
 class Cell (List):
     "Cons cell"
@@ -48,6 +47,14 @@ class Cell (List):
 class ImproperListError (Exception):
     pass
 
+class SchemeString:
+    "String in Scheme"
+    def __init__(self, string):
+        self.string = string
+
+    def __repr__(self):
+        return '"' + self.string + '"'
+
 class Closure:
     "Lambda expression with its environment"
     def __init__(self, params, body, env):
@@ -56,7 +63,7 @@ class Closure:
     def __repr__(self):
         return stringify(self)
 
-def stringify(exp):
+def stringify(exp, quote=False):
     "Convert an expression to a string."
     if exp is True:
         return '#t'
@@ -66,25 +73,27 @@ def stringify(exp):
         ss = []
         try:
             for element in exp:
-                ss.append(stringify(element))
+                ss.append(stringify(element, quote))
         except ImproperListError as ex:
             ss.append('.')
-            ss.append(stringify(ex.args[0]))
+            ss.append(stringify(ex.args[0], quote))
         return '(' + ' '.join(ss) + ')'
     elif isinstance(exp, Closure):
-        p = stringify(exp.params)
-        b = stringify(exp.body)
+        p = stringify(exp.params, True)
+        b = stringify(exp.body, True)
         e = '()' if exp.env is NIL else '#' + hex(hash(exp.env))
         return '#<' + p + ':' + b + ':' + e + '>'
     elif exp is NOCONT:
         return '#<NOCONT>'
     elif isinstance(exp, tuple) and len(exp) == 4:
         op, val, env, cont = exp
-        p = stringify(op)
-        v = stringify(val)
+        p = stringify(op, True)
+        v = stringify(val, True)
         e = '()' if env is NIL else '#' + hex(hash(env))
-        k = stringify(cont)
+        k = stringify(cont, True)
         return '#<' + p + ':' + v + ':' + e + ':\n ' + k + '>'
+    elif isinstance(exp, SchemeString) and not quote:
+        return exp.string
     else:
         return str(exp)
 
@@ -95,15 +104,12 @@ GLOBAL_ENV = (
         _(_(intern('read'), lambda x: read_expression('', '')),
           _(_(intern('eof-object?'), lambda x: isinstance(x.car, EOFError)),
             _(_(intern('symbol?'), lambda x: isinstance(x.car, str)),
-              _(_(intern('symbol->string'), lambda x: x.car),
-                _(_(intern('load'), lambda x: load(x.car)),
-                  _(_(intern('+'), lambda x: x.car + x.cdr.car),
-                    _(_(intern('-'), lambda x: x.car - x.cdr.car),
-                      _(_(intern('*'), lambda x: x.car * x.cdr.car),
-                        _(_(intern('<'), lambda x: x.car < x.cdr.car),
-                          _(_(intern('='), lambda x: x.car == x.cdr.car),
-                            _(_(SPACE, SPACE),
-                              NIL))))))))))))))
+              _(_(intern('+'), lambda x: x.car + x.cdr.car),
+                _(_(intern('-'), lambda x: x.car - x.cdr.car),
+                  _(_(intern('*'), lambda x: x.car * x.cdr.car),
+                    _(_(intern('<'), lambda x: x.car < x.cdr.car),
+                      _(_(intern('='), lambda x: x.car == x.cdr.car),
+                        NIL)))))))))))
 GLOBAL_ENV = (
     _(_(intern('car'), lambda x: x.car.car),
       _(_(intern('cdr'), lambda x: x.car.cdr),
@@ -135,14 +141,14 @@ def evaluate(exp, env=GLOBAL_ENV, k=NOCONT):
                     exp, env = Closure(kdr.car, kdr.cdr, env), None
                 elif kar is DEFINE:     # (define v e)
                     v = kdr.car
-                    assert isinstance(v, str), v # as a symbol
+                    assert isinstance(v, str), v
                     exp, k = kdr.cdr.car, (DEFINE, v, env, k)
                 elif kar is SETQ:       # (set! v e)
                     pair = _look_for_pair(kdr.car, env)
                     exp, k = kdr.cdr.car, (SETQ, pair, env, k)
                 else:
                     exp, k = kar, (APPLY, Cell(kdr, NIL), env, k)
-            elif isinstance(exp, str):  # as a symbol
+            elif isinstance(exp, str):
                 pair = _look_for_pair(exp, env)
                 exp, env = pair.cdr, None
             else:                       # as a number, #t, #f etc.
@@ -233,11 +239,21 @@ def _pair_keys_and_data_on_alist(keys, data, alist):
 
 def split_string_into_tokens(source_string):
     "split_string_into_tokens('(a 1)') => ['(', 'a', '1', ')']"
-    s = '\n'.join([x.split(';')[0] for x in source_string.split('\n')])
-    s = s.replace("'", " ' ")
-    s = s.replace(')', ' ) ')
-    s = s.replace('(', ' ( ')
-    return s.split()
+    result = []
+    for line in source_string.split('\n'):
+        ss, x = [], []
+        for i, e in enumerate(line.split('"')):
+            if i % 2 == 0:
+                x.append(e)
+            else:
+                ss.append('"' + e) # Append a string literal.
+                x.append('#s')
+        s = ' '.join(x).split(';')[0] # Ignore ;-commment.
+        s = s.replace("'", " ' ").replace(')', ' ) ').replace('(', ' ( ')
+        x = s.split()
+        result.extend([(ss.pop(0) if e == '#s' else e) for e in x])
+        assert not ss
+    return result
 
 def read_from_tokens(tokens):
     """Read an expression from a list of token strings.
@@ -267,8 +283,8 @@ def read_from_tokens(tokens):
         return False
     elif token == '#t':
         return True
-    elif token == '#\space':
-        return SPACE
+    elif token[0] == '"':
+        return SchemeString(token[1:])
     else:
         try:
             return int(token)
@@ -289,7 +305,7 @@ def load(file_name):
 
 TOKENS = []
 
-def read_expression(prompt1="> ", prompt2="| "):
+def read_expression(prompt1='> ', prompt2='| '):
     "Read an expression."
     while True:
         old = TOKENS[:]
@@ -313,7 +329,7 @@ def read_eval_print_loop():
             return
         result = evaluate(exp)
         if result is not None:
-            print(stringify(result))
+            print(stringify(result, True))
 
 if __name__ == '__main__':
     if argv[1:2]:

@@ -27,7 +27,7 @@
         lst2
       (cons (car lst1) (_append (cdr lst1) lst2)))))
 
-(define safe-positions? ; (safe-positions? (3 4 1)) => #f i.e. conflicted
+(define safe-positions? ; (safe-positions? '(3 4 1)) => #f i.e. conflicted
   (lambda (lst)
     (if (null? (cdr lst))
         #t

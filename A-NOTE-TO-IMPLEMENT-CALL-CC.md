@@ -30,6 +30,8 @@ def evaluate(exp, env=GLOBAL_ENV, k=lambda x: x):
             e3 = None if rest is NIL else rest.car
             return evaluate(e1, env, 
                             lambda x: evaluate(e2 if x else e3, env, k))
+        elif kar is BEGIN:      # (begin e...)
+            return _eval_sequentially(kdr, env, k)
 ```
 
 where `NIL` is defined as follows:
@@ -103,7 +105,7 @@ class Continuation:
     def __init__(self, cont):
         self.cont = cont
 
-    def __str__(self):
+    def __repr__(self):
         return '#<' + hex(hash(self.cont)) + '>'
 ```
 
@@ -154,11 +156,15 @@ $ ./experimental/scm.py examples/yin-yang-puzzle.scm
 ****
 *****
 ***Traceback (most recent call last):
-  File "./experimental/scm.py", line 278, in <module>
-    read_eval_print(source_string)
+  File "./experimental/scm.py", line 310, in <module>
+    load(argv[1])
+  File "./experimental/scm.py", line 278, in load
+    evaluate(exp)
 [snip]
-  File "./experimental/scm.py", line 168, in <lambda>
-    k(Cell(head, tail))))
+  File "./experimental/scm.py", line 154, in evaluate
+    pair = _look_for_pair(exp, env)
+  File "./experimental/scm.py", line 200, in _look_for_pair
+    for pair in alist:
 RuntimeError: maximum recursion depth exceeded while calling a Python object
 $ 
 ```
@@ -191,14 +197,14 @@ def evaluate(exp, env=GLOBAL_ENV, k=NOCONT):
                     exp, env = Closure(kdr.car, kdr.cdr, env), None
                 elif kar is DEFINE:     # (define v e)
                     v = kdr.car
-                    assert isinstance(v, str), v # as a symbol
+                    assert isinstance(v, str), v
                     exp, k = kdr.cdr.car, (DEFINE, v, env, k)
                 elif kar is SETQ:       # (set! v e)
                     pair = _look_for_pair(kdr.car, env)
                     exp, k = kdr.cdr.car, (SETQ, pair, env, k)
                 else:
                     exp, k = kar, (APPLY, Cell(kdr, NIL), env, k)
-            elif isinstance(exp, str):  # as a symbol
+            elif isinstance(exp, str):
                 pair = _look_for_pair(exp, env)
                 exp, env = pair.cdr, None
             else:                       # as a number, #t, #f etc.

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-A little Scheme in Python 2.7/3.7 v2.0 H31.01.13/H31.02.23 by SUZUKI Hisao
+A little Scheme in Python 2.7/3.7 v2.0 H31.01.13/H31.03.11 by SUZUKI Hisao
 """
 from __future__ import print_function
 from types import FunctionType
@@ -136,7 +136,9 @@ def evaluate(exp, env=GLOBAL_ENV, k=NOCONT):
                 elif kar is IF:         # (if e1 e2 e3) or (if e1 e2)
                     exp, k = kdr.car, (IF, kdr.cdr, env, k)
                 elif kar is BEGIN:      # (begin e...)
-                    exp, k = kdr.car, (BEGIN, kdr.cdr, env, k)
+                    exp = kdr.car
+                    if kdr.cdr is not NIL:
+                        k = (BEGIN, kdr.cdr, env, k)
                 elif kar is LAMBDA:     # (lambda (v...) e...)
                     exp, env = Closure(kdr.car, kdr.cdr, env), None
                 elif kar is DEFINE:     # (define v e)
@@ -172,10 +174,8 @@ def apply_cont(cont, exp):
         else:
             return (x.car, env, k) # (e2, env, k)
     elif op is BEGIN:           # x = (e...)
-        if x is NIL:
-            return (exp, None, k)
-        else:
-            return (x.car, env, (BEGIN, x.cdr, env, k))
+        return (x.car, env,
+                k if x.cdr is NIL else (BEGIN, x.cdr, env, k))
     elif op is DEFINE:          # x = v
         env.cdr = Cell(env.car, env.cdr)
         env.car = Cell(x, exp)

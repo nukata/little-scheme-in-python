@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-A little Scheme in Python 2.7/3.7 exp.v. H31.01.13/H31.02.23 by SUZUKI Hisao
+A little Scheme in Python 2.7/3.7 exp.v. H31.01.13/H31.03.11 by SUZUKI Hisao
 """
 from __future__ import print_function
 from types import FunctionType
@@ -172,12 +172,10 @@ def apply_function(fun, arg, k):
     else:
         raise ValueError((fun, arg))
 
-def _eval_sequentially(explist, env, k, result=None):
-    if explist is NIL:
-        return k(result)
-    else:
-        return evaluate(explist.car, env,
-                        lambda x: _eval_sequentially(explist.cdr, env, k, x))
+def _eval_sequentially(explist, env, k):
+    return evaluate(explist.car, env,
+                    k if explist.cdr is NIL else lambda x:
+                        _eval_sequentially(explist.cdr, env, k))
 
 def _evlis(arg, env, k):
     if arg is NIL:

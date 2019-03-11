@@ -118,12 +118,10 @@ from types import FunctionType
 and `_eval_sequentially` is defined as follows:
 
 ```Python
-def _eval_sequentially(explist, env, k, result=None):
-    if explist is NIL:
-        return k(result)
-    else:
-        return evaluate(explist.car, env,
-                        lambda x: _eval_sequentially(explist.cdr, env, k, x))
+def _eval_sequentially(explist, env, k):
+    return evaluate(explist.car, env,
+                    k if explist.cdr is NIL else lambda x:
+                        _eval_sequentially(explist.cdr, env, k))
 ```
 
 Such an implementation of first-class continuations is simple and elegant.
@@ -155,17 +153,17 @@ $ ./experimental/scm.py examples/yin-yang-puzzle.scm
 ***
 ****
 *****
-***Traceback (most recent call last):
-  File "./experimental/scm.py", line 310, in <module>
+******Traceback (most recent call last):
+  File "./experimental/scm.py", line 308, in <module>
     load(argv[1])
-  File "./experimental/scm.py", line 278, in load
+  File "./experimental/scm.py", line 276, in load
     evaluate(exp)
 [snip]
-  File "./experimental/scm.py", line 154, in evaluate
-    pair = _look_for_pair(exp, env)
-  File "./experimental/scm.py", line 200, in _look_for_pair
-    for pair in alist:
-RuntimeError: maximum recursion depth exceeded while calling a Python object
+  File "./experimental/scm.py", line 182, in _evlis
+    return k(NIL)
+  File "./experimental/scm.py", line 187, in <lambda>
+    k(Cell(head, tail))))
+RuntimeError: maximum recursion depth exceeded
 $ 
 ```
 
@@ -192,7 +190,9 @@ def evaluate(exp, env=GLOBAL_ENV, k=NOCONT):
                 elif kar is IF:         # (if e1 e2 e3) or (if e1 e2)
                     exp, k = kdr.car, (IF, kdr.cdr, env, k)
                 elif kar is BEGIN:      # (begin e...)
-                    exp, k = kdr.car, (BEGIN, kdr.cdr, env, k)
+                    exp = kdr.car
+                    if kdr.cdr is not NIL:
+                        k = (BEGIN, kdr.cdr, env, k)
                 elif kar is LAMBDA:     # (lambda (v...) e...)
                     exp, env = Closure(kdr.car, kdr.cdr, env), None
                 elif kar is DEFINE:     # (define v e)
@@ -235,10 +235,8 @@ def apply_cont(cont, exp):
         else:
             return (x.car, env, k) # (e2, env, k)
     elif op is BEGIN:           # x = (e...)
-        if x is NIL:
-            return (exp, None, k)
-        else:
-            return (x.car, env, (BEGIN, x.cdr, env, k))
+        return (x.car, env,
+                k if x.cdr is NIL else (BEGIN, x.cdr, env, k))
 ```
 
 Now the application function `apply_function` is defined as follows:

@@ -89,7 +89,8 @@ def apply_function(fun, arg, k):
     elif isinstance(fun, FunctionType):
         return k(fun(arg))
     elif isinstance(fun, Closure):
-        env = _pair_keys_and_data_on_alist(fun.params, arg, fun.env)
+        env = Cell(Cell(None, None), # marker of the frame top
+                   _pair_keys_and_data_on_alist(fun.params, arg, fun.env))
         return _eval_sequentially(fun.body, env, k)
     else:
         raise ValueError((fun, arg))
@@ -154,14 +155,14 @@ $ ./experimental/scm.py examples/yin-yang-puzzle.scm
 ****
 *****
 ******Traceback (most recent call last):
-  File "./experimental/scm.py", line 308, in <module>
+  File "./experimental/scm.py", line 318, in <module>
     load(argv[1])
-  File "./experimental/scm.py", line 276, in load
+  File "./experimental/scm.py", line 286, in load
     evaluate(exp)
 [snip]
-  File "./experimental/scm.py", line 182, in _evlis
+  File "./experimental/scm.py", line 192, in _evlis
     return k(NIL)
-  File "./experimental/scm.py", line 187, in <lambda>
+  File "./experimental/scm.py", line 197, in <lambda>
     k(Cell(head, tail))))
 RuntimeError: maximum recursion depth exceeded
 $ 
@@ -256,7 +257,8 @@ def apply_function(fun, arg, k):
     if isinstance(fun, FunctionType):
         return (fun(arg), None, k)
     elif isinstance(fun, Closure):
-        env = _pair_keys_and_data_on_alist(fun.params, arg, fun.env)
+        env = Cell(Cell(None, None), # marker of the frame top
+                   _pair_keys_and_data_on_alist(fun.params, arg, fun.env))
         return (Cell(BEGIN, fun.body), env, k)
     elif isinstance(fun, tuple): # as a continuation
         return (arg.car, None, fun)

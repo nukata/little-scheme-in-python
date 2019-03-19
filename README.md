@@ -1,6 +1,6 @@
 # A Little Scheme in Python
 
-This is a small (≈ 300 lines) interpreter of a subset of Scheme.
+This is a small (≈ 350 lines) interpreter of a subset of Scheme.
 It runs on both Python 2.7 and Python 3.7.
 As a Scheme implementation, 
 it optimizes _tail calls_ and handles _first-class continuations_ properly.
@@ -188,13 +188,16 @@ For simplicity, this Scheme treats (`define` _v_ _e_) as an expression type.
 | (`eqv?` _x_ _y_)     | (`display` _x_)       | (`*` _x_ _y_)       |
 | (`pair?` _x_)        | (`newline`)           | (`<` _x_ _y_)       |
 | (`null?` _x_)        | (`read`)              | (`=` _x_ _y_)       |
-|                      |                       |                     |
+|                      |                       | (`globals`)         |
 
-See [`GLOBAL_ENV`](scm.py#L101-L125)
+`(globals)` returns a list of keys of the global environment.
+It is not in the standard.
+
+See [`GLOBAL_ENV`](scm.py#L108-L134)
 in `scm.py` for the implementation of the procedures
 except `call/cc` and `apply`.  
 `call/cc` and `apply` are implemented particularly at 
-[`apply_function`](scm.py#L196-L215) in `scm.py`.
+[`apply_function`](scm.py#L205-L225) in `scm.py`.
 
 I hope this serves as a popular model of how to write a Scheme interpreter
 in Python.

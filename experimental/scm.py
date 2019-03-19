@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-A little Scheme in Python 2.7/3.7 exp.v. H31.01.13/H31.03.11 by SUZUKI Hisao
+A little Scheme in Python 2.7/3.7 exp.v. H31.01.13/H31.03.19 by SUZUKI Hisao
 """
 from __future__ import print_function
 from types import FunctionType
@@ -95,6 +95,13 @@ def stringify(exp, quote=False):
     else:
         return str(exp)
 
+def _globals(x):
+    "Return a list of keys of the global environment."
+    j = NIL
+    for e in GLOBAL_ENV.cdr:    # Take cdr to skip the marker.
+        j = Cell(e.car, j)
+    return j
+
 _ = Cell
 GLOBAL_ENV = (
     _(_(intern('display'), lambda x: print(stringify(x.car), end='')),
@@ -107,20 +114,22 @@ GLOBAL_ENV = (
                   _(_(intern('*'), lambda x: x.car * x.cdr.car),
                     _(_(intern('<'), lambda x: x.car < x.cdr.car),
                       _(_(intern('='), lambda x: x.car == x.cdr.car),
-                        NIL)))))))))))
+                        _(_(intern('globals'), _globals),
+                          NIL))))))))))))
 GLOBAL_ENV = (
-    _(_(intern('car'), lambda x: x.car.car),
-      _(_(intern('cdr'), lambda x: x.car.cdr),
-        _(_(intern('cons'), lambda x: Cell(x.car, x.cdr.car)),
-          _(_(intern('eq?'), lambda x: x.car is x.cdr.car),
-            _(_(intern('eqv?'), lambda x: x.car == x.cdr.car),
-              _(_(intern('pair?'), lambda x: isinstance(x.car, Cell)),
-                _(_(intern('null?'), lambda x: x.car is NIL),
-                  _(_(intern('not'), lambda x: x.car is False),
-                    _(_(intern('list'), lambda x: x),
-                      _(_(CALLCC, CALLCC),
-                        _(_(APPLY, APPLY),
-                          GLOBAL_ENV))))))))))))
+    _(_(None, None),            # marker of the frame top
+      _(_(intern('car'), lambda x: x.car.car),
+        _(_(intern('cdr'), lambda x: x.car.cdr),
+          _(_(intern('cons'), lambda x: Cell(x.car, x.cdr.car)),
+            _(_(intern('eq?'), lambda x: x.car is x.cdr.car),
+              _(_(intern('eqv?'), lambda x: x.car == x.cdr.car),
+                _(_(intern('pair?'), lambda x: isinstance(x.car, Cell)),
+                  _(_(intern('null?'), lambda x: x.car is NIL),
+                    _(_(intern('not'), lambda x: x.car is False),
+                      _(_(intern('list'), lambda x: x),
+                        _(_(CALLCC, CALLCC),
+                          _(_(APPLY, APPLY),
+                            GLOBAL_ENV)))))))))))))
 
 
 def evaluate(exp, env=GLOBAL_ENV, k=lambda x: x):
@@ -167,7 +176,8 @@ def apply_function(fun, arg, k):
     elif isinstance(fun, FunctionType):
         return k(fun(arg))
     elif isinstance(fun, Closure):
-        env = _pair_keys_and_data_on_alist(fun.params, arg, fun.env)
+        env = Cell(Cell(None, None), # marker of the frame top
+                   _pair_keys_and_data_on_alist(fun.params, arg, fun.env))
         return _eval_sequentially(fun.body, env, k)
     else:
         raise ValueError((fun, arg))
@@ -187,8 +197,8 @@ def _evlis(arg, env, k):
                                        k(Cell(head, tail))))
 
 def _define(v, e, env):
-    env.cdr = Cell(env.car, env.cdr)
-    env.car = Cell(v, e)
+    assert env.car.car is None  # Check env for the marker.
+    env.cdr = Cell(Cell(v, e), env.cdr)
 
 def _setq(pair, e):
     pair.cdr = e

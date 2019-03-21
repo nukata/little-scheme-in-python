@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-A little Scheme in Python 2.7/3.7 v2.2 H31.01.13/H31.03.22 by SUZUKI Hisao
+A little Scheme in Python 2.7/3.7 v2.1 H31.01.13/H31.03.19 by SUZUKI Hisao
 """
 from __future__ import print_function
 from types import FunctionType
@@ -85,12 +85,13 @@ def stringify(exp, quote=False):
         return '#<' + p + ':' + b + ':' + e + '>'
     elif exp is NOCONT:
         return '#<NOCONT>'
-    elif isinstance(exp, tuple) and len(exp) == 3:
-        op, val, cont = exp
+    elif isinstance(exp, tuple) and len(exp) == 4:
+        op, val, env, cont = exp
         p = stringify(op, True)
         v = stringify(val, True)
+        e = '()' if env is NIL else '#' + hex(hash(env))
         k = stringify(cont, True)
-        return '#<' + p + ':' + v + ':\n ' + k + '>'
+        return '#<' + p + ':' + v + ':' + e + ':\n ' + k + '>'
     elif isinstance(exp, SchemeString) and not quote:
         return exp.string
     else:
@@ -133,128 +134,102 @@ GLOBAL_ENV = (
                             GLOBAL_ENV)))))))))))))
 
 
-# Continuation operators
-THEN = intern('then')
-APPLY_FUN = intern('aplly-fun')
-EVAL_ARG = intern('eval-arg')
-PUSH_ARGS = intern('push-args')
-RESTORE_ENV = intern('restore-env')
-
-def evaluate(exp, env=GLOBAL_ENV):
-    "Evaluate an expression in an environment."
-    k = NOCONT
+def evaluate(exp, env=GLOBAL_ENV, k=NOCONT):
+    "Evaluate an expression with an environment and a continuation."
     while True:
-        while True:
+        while env is not None: # None as env means expr has been evaluated.
             if isinstance(exp, Cell):
                 kar, kdr = exp.car, exp.cdr
-                if kar is QUOTE: # (quote e)
-                    exp = kdr.car
-                    break
-                elif kar is IF: # (if e1 e2 e3) or (if e1 e2)
-                    exp, k = kdr.car, (THEN, kdr.cdr, k)
-                elif kar is BEGIN: # (begin e...)
+                if kar is QUOTE:        # (quote e)
+                    exp, env = kdr.car, None
+                elif kar is IF:         # (if e1 e2 e3) or (if e1 e2)
+                    exp, k = kdr.car, (IF, kdr.cdr, env, k)
+                elif kar is BEGIN:      # (begin e...)
                     exp = kdr.car
                     if kdr.cdr is not NIL:
-                        k = (BEGIN, kdr.cdr, k)
-                elif kar is LAMBDA: # (lambda (v...) e...)
-                    exp = Closure(kdr.car, kdr.cdr, env)
-                    break
-                elif kar is DEFINE: # (define v e)
+                        k = (BEGIN, kdr.cdr, env, k)
+                elif kar is LAMBDA:     # (lambda (v...) e...)
+                    exp, env = Closure(kdr.car, kdr.cdr, env), None
+                elif kar is DEFINE:     # (define v e)
                     v = kdr.car
                     assert isinstance(v, str), v
-                    exp, k = kdr.cdr.car, (DEFINE, v, k)
-                elif kar is SETQ: # (set! v e)
+                    exp, k = kdr.cdr.car, (DEFINE, v, env, k)
+                elif kar is SETQ:       # (set! v e)
                     pair = _look_for_pair(kdr.car, env)
-                    exp, k = kdr.cdr.car, (SETQ, pair, k)
+                    exp, k = kdr.cdr.car, (SETQ, pair, env, k)
                 else:
-                    exp, k = kar, (APPLY, kdr, k)
+                    exp, k = kar, (APPLY, Cell(kdr, NIL), env, k)
             elif isinstance(exp, str):
                 pair = _look_for_pair(exp, env)
-                exp = pair.cdr
-                break
-            else:               # as a number, #t, #f etc.
-                break
-        while True:
-            if k is NOCONT:
-                return exp
-            op, x, k = k
-            if op is THEN:      # x = (e2 e3)
-                if exp is False:
-                    if x.cdr is NIL:
-                        exp = None
-                    else:
-                        exp = x.cdr.car # e3
-                        break
-                else:
-                    exp = x.car # e2
-                    break
-            elif op is BEGIN:   # x = (e...)
-                if x.cdr is not NIL: # unless tail call...
-                    k = (BEGIN, x.cdr, k)
-                exp = x.car
-                break
-            elif op is DEFINE:  # x = v
-                assert env.car.car is None # Check env for the marker.
-                env.cdr = Cell(Cell(x, exp), env.cdr)
-                exp = None
-            elif op is SETQ:    # x = (v . e)
-                x.cdr = exp
-                exp = None
-            elif op is APPLY:   # x = args; exp = fun
-                if x is NIL:
-                    exp, k, env = apply_function(exp, NIL, k, env)
-                else:
-                    k = (APPLY_FUN, exp, k)
-                    while x.cdr is not NIL:
-                        k = (EVAL_ARG, x.car, k)
-                        x = x.cdr
-                    exp = x.car
-                    k = (PUSH_ARGS, NIL, k)
-                    break
-            elif op is PUSH_ARGS: # x = evaluated args
-                args = Cell(exp, x)
-                op, exp, k = k
-                if op is EVAL_ARG: # exp = next arg
-                    k = (PUSH_ARGS, args, k)
-                    break
-                elif op is APPLY_FUN: # exp = evaluated fun
-                    exp, k, env = apply_function(exp, args, k, env)
-                else:
-                    raise ValueError((op, exp))
-            elif op is RESTORE_ENV: # x = env
-                env = x
-            else:
-                raise ValueError((op, x))
+                exp, env = pair.cdr, None
+            else:                       # as a number, #t, #f etc.
+                env = None
+        if k is NOCONT:
+            return exp
+        else:
+            exp, env, k = apply_cont(k, exp)
 
-def apply_function(fun, arg, k, env):
+def apply_cont(cont, exp):
+    """Apply a continuation to an expression.
+    It returns (expression, environment, continuation).
+    """
+    op, x, env, k = cont
+    if op is IF:                # x = (e2 e3)
+        if exp is False:
+            if x.cdr is NIL:
+                return (None, env, k)
+            else:
+                return (x.cdr.car, env, k) # (e3, env, k)
+        else:
+            return (x.car, env, k) # (e2, env, k)
+    elif op is BEGIN:           # x = (e...)
+        return (x.car, env,
+                k if x.cdr is NIL else (BEGIN, x.cdr, env, k))
+    elif op is DEFINE:          # x = v
+        assert env.car.car is None # Check env for the marker.
+        env.cdr = Cell(Cell(x, exp), env.cdr)
+        return (None, None, k)
+    elif op is SETQ:            # x = (v . e)
+        x.cdr = exp
+        return (None, None, k)
+    elif op is APPLY:           # x = (arguments . evaluated)
+        args, evaled = x.car, Cell(exp, x.cdr)
+        if args is NIL:
+            evaled = _reverse(evaled)
+            return apply_function(evaled.car, evaled.cdr, k)
+        else:
+            return (args.car, env, (APPLY, Cell(args.cdr, evaled), env, k))
+    else:
+        raise ValueError((cont, exp))
+
+def apply_function(fun, arg, k):
     """Apply a function to arguments with a continuation.
-    It returns (result, continuation, environment).
+    It returns (expression, environment, continuation).
     """
     while True:
         if fun is CALLCC:
-            k = _push_RESTORE_ENV(k, env)
             fun, arg = arg.car, Cell(k, NIL)
         elif fun is APPLY:
             fun, arg = arg.car, arg.cdr.car
         else:
             break
     if isinstance(fun, FunctionType):
-        return fun(arg), k, env
+        return (fun(arg), None, k)
     elif isinstance(fun, Closure):
-        k = _push_RESTORE_ENV(k, env)
-        k = (BEGIN, fun.body, k)
         env = Cell(Cell(None, None), # marker of the frame top
                    _pair_keys_and_data_on_alist(fun.params, arg, fun.env))
-        return None, k, env
+        return (Cell(BEGIN, fun.body), env, k)
     elif isinstance(fun, tuple): # as a continuation
-        return arg.car, fun, env
+        return (arg.car, None, fun)
     else:
         raise ValueError((fun, arg))
 
-def _push_RESTORE_ENV(k, env):
-    if k is NOCONT or k[0] is not RESTORE_ENV: # unless tail call...
-        k = (RESTORE_ENV, env, k)
-    return k
+def _reverse(lst, result=NIL):
+    "_reverse((a b c d)) => (d c b a)"
+    j = NIL
+    for e in lst:
+        j = Cell(e, j)
+    return j
 
 def _look_for_pair(key, alist):
     "_look_for_pair(b, ((a . 1) (b . 2) (c . 3))) => (b . 2)"

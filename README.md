@@ -145,10 +145,8 @@ which is a meta-circular interpreter of this Scheme.
 | closures `(lambda (x) (+ x 1))`     | `class Closure`                     |
 
 Continuations are represented by Python tuples of the form
-(_operation_, _value_, _environment_, _next continuation_)
+(_operation_, _value_, _next continuation_)
 and will be passed by `call/cc` to its argument.
-See [`A-NOTE-TO-IMPLEMENT-CALL-CC.md`](A-NOTE-TO-IMPLEMENT-CALL-CC.md)
-for the implementation.
 
 Python's native string type `str` has `intern` function.
 It is reasonable to use it as Scheme's symbol type.

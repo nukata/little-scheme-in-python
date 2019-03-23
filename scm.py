@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 """
-A little Scheme in Python 2.7/3.7 v2.2 H31.01.13/H31.03.22 by SUZUKI Hisao
+A little Scheme in Python 2.7/3.7 v3.0 H31.01.13/H31.03.23 by SUZUKI Hisao
 """
 from __future__ import print_function
-from types import FunctionType
 from sys import argv, exit
 try:
     from sys import intern      # for Python 3.7
@@ -13,14 +12,18 @@ except ImportError:
 
 class List:
     "Empty list"
-    def __repr__(self):
-        return stringify(self)
+    __slots__ = ()
 
     def __iter__(self):
         return iter(())
 
+    def __len__(self):
+        n = 0
+        for e in self:
+            n += 1
+        return n
+
 NIL = List()
-NOCONT = ()                     # NOCONT means there is no continuation.
 QUOTE = intern('quote')         # Use an interned string as a symbol.
 IF = intern('if')
 BEGIN = intern('begin')
@@ -30,8 +33,18 @@ SETQ = intern('set!')
 APPLY = intern('apply')
 CALLCC = intern('call/cc')
 
+NOCONT = ()                   # NOCONT means there is no continuation.
+# Continuation operators
+THEN = intern('then')
+APPLY_FUN = intern('aplly-fun')
+EVAL_ARG = intern('eval-arg')
+PUSH_ARGS = intern('push-args')
+RESTORE_ENV = intern('restore-env')
+
 class Cell (List):
     "Cons cell"
+    __slots__ = ('car', 'cdr')
+
     def __init__(self, car, cdr):
         self.car, self.cdr = car, cdr
 
@@ -55,15 +68,60 @@ class SchemeString:
     def __repr__(self):
         return '"' + self.string + '"'
 
+
+class Environment:
+    "Linked list of bindings mapping symbols to values"
+    __slots__ = ('sym', 'val', 'next')
+
+    def __init__(self, sym, val, next):
+        "(env.sym is None) means the env is the frame top. "
+        self.sym, self.val, self.next = sym, val, next
+
+    def __iter__(self):
+        "Yield each binding in the linked list."
+        env = self
+        while env is not None:
+            yield env
+            env = env.next
+
+    def look_for(self, symbol):
+        "Search the bindings for a symbol."
+        for env in self:
+            if env.sym is symbol:
+                return env
+        raise NameError(symbol)
+
+    def prepend_defs(self, symbols, data):
+        "Build a new environment prepending the bindings of symbols and data."
+        env = self
+        if symbols is NIL:
+            if data is not NIL:
+                raise TypeError('surplus arg: ' + stringify(data))
+            return env
+        else:
+            if data is NIL:
+                raise TypeError('surplus param: ' + stringify(symbols))
+            return Environment(symbols.car, data.car,
+                               env.prepend_defs(symbols.cdr, data.cdr))
+
 class Closure:
     "Lambda expression with its environment"
+    __slots__ = ('params', 'body', 'env')
+
     def __init__(self, params, body, env):
         self.params, self.body, self.env = params, body, env
 
-    def __repr__(self):
-        return stringify(self)
+class Intrinsic:
+    "Built-in function"
+    __slots__ = ('name', 'arity', 'fun')
 
-def stringify(exp, quote=False):
+    def __init__(self, name, arity, fun):
+        self.name, self.arity, self.fun = name, arity, fun
+
+    def __repr__(self):
+        return '#<%s:%d>' % (self.name, self.arity)
+
+def stringify(exp, quote=True):
     "Convert an expression to a string."
     if exp is True:
         return '#t'
@@ -78,18 +136,22 @@ def stringify(exp, quote=False):
             ss.append('.')
             ss.append(stringify(ex.args[0], quote))
         return '(' + ' '.join(ss) + ')'
+    elif isinstance(exp, Environment):
+        ss = []
+        for env in exp:
+            if env is GLOBAL_ENV:
+                ss.append('GlobalEnv')
+                break
+            elif env.sym is None: # marker of the frame top
+                ss.append('|')
+            else:
+                ss.append(env.sym)
+        return '#<' + ' '.join(ss) + '>'
     elif isinstance(exp, Closure):
-        p = stringify(exp.params, True)
-        b = stringify(exp.body, True)
-        e = '()' if exp.env is NIL else '#' + hex(hash(exp.env))
+        p, b, e = [stringify(x) for x in (exp.params, exp.body, exp.env)]
         return '#<' + p + ':' + b + ':' + e + '>'
-    elif exp is NOCONT:
-        return '#<NOCONT>'
     elif isinstance(exp, tuple) and len(exp) == 3:
-        op, val, cont = exp
-        p = stringify(op, True)
-        v = stringify(val, True)
-        k = stringify(cont, True)
+        p, v, k = [stringify(x) for x in exp]
         return '#<' + p + ':' + v + ':\n ' + k + '>'
     elif isinstance(exp, SchemeString) and not quote:
         return exp.string
@@ -98,133 +160,132 @@ def stringify(exp, quote=False):
 
 def _globals(x):
     "Return a list of keys of the global environment."
-    j = NIL
-    for e in GLOBAL_ENV.cdr:    # Take cdr to skip the marker.
-        j = Cell(e.car, j)
+    j, env = NIL, GLOBAL_ENV.next # Take next to skip the marker.
+    for e in env:
+        j = Cell(e.sym, j)
     return j
 
-_ = Cell
+_ = lambda n, a, f, next: Environment(intern(n), Intrinsic(n, a, f), next)
 GLOBAL_ENV = (
-    _(_(intern('display'), lambda x: print(stringify(x.car), end='')),
-      _(_(intern('newline'), lambda x: print()),
-        _(_(intern('read'), lambda x: read_expression('', '')),
-          _(_(intern('eof-object?'), lambda x: isinstance(x.car, EOFError)),
-            _(_(intern('symbol?'), lambda x: isinstance(x.car, str)),
-              _(_(intern('+'), lambda x: x.car + x.cdr.car),
-                _(_(intern('-'), lambda x: x.car - x.cdr.car),
-                  _(_(intern('*'), lambda x: x.car * x.cdr.car),
-                    _(_(intern('<'), lambda x: x.car < x.cdr.car),
-                      _(_(intern('='), lambda x: x.car == x.cdr.car),
-                        _(_(intern('globals'), _globals),
-                          NIL))))))))))))
-GLOBAL_ENV = (
-    _(_(None, None),            # marker of the frame top
-      _(_(intern('car'), lambda x: x.car.car),
-        _(_(intern('cdr'), lambda x: x.car.cdr),
-          _(_(intern('cons'), lambda x: Cell(x.car, x.cdr.car)),
-            _(_(intern('eq?'), lambda x: x.car is x.cdr.car),
-              _(_(intern('eqv?'), lambda x: x.car == x.cdr.car),
-                _(_(intern('pair?'), lambda x: isinstance(x.car, Cell)),
-                  _(_(intern('null?'), lambda x: x.car is NIL),
-                    _(_(intern('not'), lambda x: x.car is False),
-                      _(_(intern('list'), lambda x: x),
-                        _(_(CALLCC, CALLCC),
-                          _(_(APPLY, APPLY),
-                            GLOBAL_ENV)))))))))))))
+    _('display', 1, lambda x: print(stringify(x.car, False), end=''),
+      _('newline', 0, lambda x: print(),
+        _('read', 0, lambda x: read_expression('', ''),
+          _('eof-object?', 1, lambda x: isinstance(x.car, EOFError),
+            _('symbol?', 1, lambda x: isinstance(x.car, str),
+              _('+', 2, lambda x: x.car + x.cdr.car,
+                _('-', 2, lambda x: x.car - x.cdr.car,
+                  _('*', 2, lambda x: x.car * x.cdr.car,
+                    _('<', 2, lambda x: x.car < x.cdr.car,
+                      _('=', 2, lambda x: x.car == x.cdr.car,
+                        _('globals', 0, _globals,
+                          None))))))))))))
+GLOBAL_ENV = Environment(
+    None, None,                 # marker of the frame top
+    _('car', 1, lambda x: x.car.car,
+      _('cdr', 1, lambda x: x.car.cdr,
+        _('cons', 2, lambda x: Cell(x.car, x.cdr.car),
+          _('eq?', 2, lambda x: x.car is x.cdr.car,
+            _('eqv?', 2, lambda x: x.car == x.cdr.car,
+              _('pair?', 1, lambda x: isinstance(x.car, Cell),
+                _('null?', 1, lambda x: x.car is NIL,
+                  _('not', 1, lambda x: x.car is False,
+                    _('list', -1, lambda x: x,
+                      Environment(CALLCC, CALLCC,
+                                  Environment(APPLY, APPLY,
+                                              GLOBAL_ENV))))))))))))
 
 
-# Continuation operators
-THEN = intern('then')
-APPLY_FUN = intern('aplly-fun')
-EVAL_ARG = intern('eval-arg')
-PUSH_ARGS = intern('push-args')
-RESTORE_ENV = intern('restore-env')
-
 def evaluate(exp, env=GLOBAL_ENV):
     "Evaluate an expression in an environment."
     k = NOCONT
-    while True:
+    try:
         while True:
-            if isinstance(exp, Cell):
-                kar, kdr = exp.car, exp.cdr
-                if kar is QUOTE: # (quote e)
-                    exp = kdr.car
-                    break
-                elif kar is IF: # (if e1 e2 e3) or (if e1 e2)
-                    exp, k = kdr.car, (THEN, kdr.cdr, k)
-                elif kar is BEGIN: # (begin e...)
-                    exp = kdr.car
-                    if kdr.cdr is not NIL:
-                        k = (BEGIN, kdr.cdr, k)
-                elif kar is LAMBDA: # (lambda (v...) e...)
-                    exp = Closure(kdr.car, kdr.cdr, env)
-                    break
-                elif kar is DEFINE: # (define v e)
-                    v = kdr.car
-                    assert isinstance(v, str), v
-                    exp, k = kdr.cdr.car, (DEFINE, v, k)
-                elif kar is SETQ: # (set! v e)
-                    pair = _look_for_pair(kdr.car, env)
-                    exp, k = kdr.cdr.car, (SETQ, pair, k)
-                else:
-                    exp, k = kar, (APPLY, kdr, k)
-            elif isinstance(exp, str):
-                pair = _look_for_pair(exp, env)
-                exp = pair.cdr
-                break
-            else:               # as a number, #t, #f etc.
-                break
-        while True:
-            if k is NOCONT:
-                return exp
-            op, x, k = k
-            if op is THEN:      # x = (e2 e3)
-                if exp is False:
-                    if x.cdr is NIL:
-                        exp = None
-                    else:
-                        exp = x.cdr.car # e3
+            while True:
+                if isinstance(exp, Cell):
+                    kar, kdr = exp.car, exp.cdr
+                    if kar is QUOTE: # (quote e)
+                        exp = kdr.car
                         break
-                else:
-                    exp = x.car # e2
+                    elif kar is IF: # (if e1 e2 e3) or (if e1 e2)
+                        exp, k = kdr.car, (THEN, kdr.cdr, k)
+                    elif kar is BEGIN: # (begin e...)
+                        exp = kdr.car
+                        if kdr.cdr is not NIL:
+                            k = (BEGIN, kdr.cdr, k)
+                    elif kar is LAMBDA: # (lambda (v...) e...)
+                        exp = Closure(kdr.car, kdr.cdr, env)
+                        break
+                    elif kar is DEFINE: # (define v e)
+                        v = kdr.car
+                        assert isinstance(v, str), v
+                        exp, k = kdr.cdr.car, (DEFINE, v, k)
+                    elif kar is SETQ: # (set! v e)
+                        exp, k = kdr.cdr.car, (SETQ, env.look_for(kdr.car), k)
+                    else:
+                        exp, k = kar, (APPLY, kdr, k)
+                elif isinstance(exp, str):
+                    exp = env.look_for(exp).val
                     break
-            elif op is BEGIN:   # x = (e...)
-                if x.cdr is not NIL: # unless tail call...
-                    k = (BEGIN, x.cdr, k)
-                exp = x.car
-                break
-            elif op is DEFINE:  # x = v
-                assert env.car.car is None # Check env for the marker.
-                env.cdr = Cell(Cell(x, exp), env.cdr)
-                exp = None
-            elif op is SETQ:    # x = (v . e)
-                x.cdr = exp
-                exp = None
-            elif op is APPLY:   # x = args; exp = fun
-                if x is NIL:
-                    exp, k, env = apply_function(exp, NIL, k, env)
-                else:
-                    k = (APPLY_FUN, exp, k)
-                    while x.cdr is not NIL:
-                        k = (EVAL_ARG, x.car, k)
-                        x = x.cdr
+                else:           # as a number, #t, #f etc.
+                    break
+            while True:
+                if k is NOCONT:
+                    return exp
+                op, x, k = k
+                if op is THEN:  # x = (e2 e3)
+                    if exp is False:
+                        if x.cdr is NIL:
+                            exp = None
+                        else:
+                            exp = x.cdr.car # e3
+                            break
+                    else:
+                        exp = x.car # e2
+                        break
+                elif op is BEGIN: # x = (e...)
+                    if x.cdr is not NIL: # unless tail call...
+                        k = (BEGIN, x.cdr, k)
                     exp = x.car
-                    k = (PUSH_ARGS, NIL, k)
                     break
-            elif op is PUSH_ARGS: # x = evaluated args
-                args = Cell(exp, x)
-                op, exp, k = k
-                if op is EVAL_ARG: # exp = next arg
-                    k = (PUSH_ARGS, args, k)
-                    break
-                elif op is APPLY_FUN: # exp = evaluated fun
-                    exp, k, env = apply_function(exp, args, k, env)
+                elif op is DEFINE: # x = v
+                    assert env.sym is None # Check for the marker.
+                    env.next = Environment(x, exp, env.next)
+                    exp = None
+                elif op is SETQ: # x = Environment(v, e, next)
+                    x.val = exp
+                    exp = None
+                elif op is APPLY: # x = args; exp = fun
+                    if x is NIL:
+                        exp, k, env = apply_function(exp, NIL, k, env)
+                    else:
+                        k = (APPLY_FUN, exp, k)
+                        while x.cdr is not NIL:
+                            k = (EVAL_ARG, x.car, k)
+                            x = x.cdr
+                        exp = x.car
+                        k = (PUSH_ARGS, NIL, k)
+                        break
+                elif op is PUSH_ARGS: # x = evaluated args
+                    args = Cell(exp, x)
+                    op, exp, k = k
+                    if op is EVAL_ARG: # exp = the next arg
+                        k = (PUSH_ARGS, args, k)
+                        break
+                    elif op is APPLY_FUN: # exp = evaluated fun
+                        exp, k, env = apply_function(exp, args, k, env)
+                    else:
+                        raise RuntimeError('unexpected op: %s: %s' %
+                                           (stringify(op), stringify(exp)))
+                elif op is RESTORE_ENV: # x = env
+                    env = x
                 else:
-                    raise ValueError((op, exp))
-            elif op is RESTORE_ENV: # x = env
-                env = x
-            else:
-                raise ValueError((op, x))
+                    raise RuntimeError('bad op: %s: %s' %
+                                       (stringify(op), stringify(x)))
+    except Exception as ex:
+        msg = type(ex).__name__ + ': ' + str(ex)
+        if k is not NOCONT:
+            msg += '\n ' + stringify(k)
+        raise Exception(msg)
 
 def apply_function(fun, arg, k, env):
     """Apply a function to arguments with a continuation.
@@ -238,38 +299,28 @@ def apply_function(fun, arg, k, env):
             fun, arg = arg.car, arg.cdr.car
         else:
             break
-    if isinstance(fun, FunctionType):
-        return fun(arg), k, env
+    if isinstance(fun, Intrinsic):
+        if fun.arity >= 0:
+            if len(arg) != fun.arity:
+                raise TypeError('arity not matched: ' + str(fun) + ' and '
+                                + stringify(arg))
+        return fun.fun(arg), k, env
     elif isinstance(fun, Closure):
         k = _push_RESTORE_ENV(k, env)
         k = (BEGIN, fun.body, k)
-        env = Cell(Cell(None, None), # marker of the frame top
-                   _pair_keys_and_data_on_alist(fun.params, arg, fun.env))
+        env = Environment(None, None, # marker of the frame top
+                          fun.env.prepend_defs(fun.params, arg))
         return None, k, env
     elif isinstance(fun, tuple): # as a continuation
         return arg.car, fun, env
     else:
-        raise ValueError((fun, arg))
+        raise TypeError('not a function: ' + stringify(fun) + ' with ' 
+                        + stringify(arg))
 
 def _push_RESTORE_ENV(k, env):
     if k is NOCONT or k[0] is not RESTORE_ENV: # unless tail call...
         k = (RESTORE_ENV, env, k)
     return k
-
-def _look_for_pair(key, alist):
-    "_look_for_pair(b, ((a . 1) (b . 2) (c . 3))) => (b . 2)"
-    for pair in alist:
-        if pair.car is key:
-            return pair
-    raise NameError(key)
-
-def _pair_keys_and_data_on_alist(keys, data, alist):
-    "_pair_keys_and_data_on_alist((a b), (1 2), x) => ((a . 1) (b . 2) . x)"
-    if keys is NIL:
-        return alist
-    else:
-        return Cell(Cell(keys.car, data.car),
-                    _pair_keys_and_data_on_alist(keys.cdr, data.cdr, alist))
 
 
 def split_string_into_tokens(source_string):
@@ -362,9 +413,12 @@ def read_eval_print_loop():
         if isinstance(exp, EOFError):
             print('Goodbye')
             return
-        result = evaluate(exp)
-        if result is not None:
-            print(stringify(result, True))
+        try:
+            result = evaluate(exp)
+            if result is not None:
+                print(stringify(result, True))
+        except Exception as ex:
+            print(ex)
 
 if __name__ == '__main__':
     if argv[1:2]:

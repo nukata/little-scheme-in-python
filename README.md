@@ -1,9 +1,13 @@
 # A Little Scheme in Python
 
-This is a small (≈ 350 lines) interpreter of a subset of Scheme.
+This is a small (≈ 400 lines) interpreter of a subset of Scheme.
 It runs on both Python 2.7 and Python 3.7.
 As a Scheme implementation, 
 it optimizes _tail calls_ and handles _first-class continuations_ properly.
+
+The implementation has been revised along with
+[little-scheme-in-go](https://github.com/nukata/little-scheme-in-go).
+See [`archived`](archived) folder for the previous implementation.
 
 
 ## How to use
@@ -143,6 +147,7 @@ which is a meta-circular interpreter of this Scheme.
 | `()`                                | `NIL`, a singleton of `List`        |
 | pairs `(1 . 2)`, `(x y z)`          | `class Cell (List)`                 |
 | closures `(lambda (x) (+ x 1))`     | `class Closure`                     |
+| built-in procedures `car`, `cdr`    | `class Intrinsic`                   |
 
 Continuations are represented by Python tuples of the form
 (_operation_, _value_, _next continuation_)
@@ -191,11 +196,11 @@ For simplicity, this Scheme treats (`define` _v_ _e_) as an expression type.
 `(globals)` returns a list of keys of the global environment.
 It is not in the standard.
 
-See [`GLOBAL_ENV`](scm.py#L108-L134)
+See [`GLOBAL_ENV`](scm.py#L169-L195)
 in `scm.py` for the implementation of the procedures
 except `call/cc` and `apply`.  
 `call/cc` and `apply` are implemented particularly at 
-[`apply_function`](scm.py#L205-L225) in `scm.py`.
+[`apply_function`](scm.py#L290-L318) in `scm.py`.
 
 I hope this serves as a popular model of how to write a Scheme interpreter
 in Python.

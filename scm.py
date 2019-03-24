@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-A little Scheme in Python 2.7/3.7 v3.0 H31.01.13/H31.03.23 by SUZUKI Hisao
+A little Scheme in Python 2.7/3.7 v3.0 H31.01.13/H31.03.24 by SUZUKI Hisao
 """
 from __future__ import print_function
 from sys import argv, exit
@@ -92,17 +92,16 @@ class Environment:
         raise NameError(symbol)
 
     def prepend_defs(self, symbols, data):
-        "Build a new environment prepending the bindings of symbols and data."
-        env = self
+        "Build an environment prepending the bindings of symbols and data."
         if symbols is NIL:
             if data is not NIL:
                 raise TypeError('surplus arg: ' + stringify(data))
-            return env
+            return self
         else:
             if data is NIL:
                 raise TypeError('surplus param: ' + stringify(symbols))
             return Environment(symbols.car, data.car,
-                               env.prepend_defs(symbols.cdr, data.cdr))
+                               self.prepend_defs(symbols.cdr, data.cdr))
 
 class Closure:
     "Lambda expression with its environment"
@@ -397,23 +396,25 @@ def read_expression(prompt1='> ', prompt2='| '):
         old = TOKENS[:]
         try:
             return read_from_tokens(TOKENS)
-        except IndexError:      # tokens.pop(0) failed unexpectedly.
+        except IndexError:      # tokens have run out unexpectedly.
             try:
                 source_string = raw_input(prompt2 if old else prompt1)
             except EOFError as ex:
-                del TOKENS[:]
                 return ex
             TOKENS[:] = old
             TOKENS.extend(split_string_into_tokens(source_string))
+        except SyntaxError:
+            del TOKENS[:]       # Discard the erroneous tokens.
+            raise
 
 def read_eval_print_loop():
     "Repeat read-eval-print until End-of-File."
     while True:
-        exp = read_expression()
-        if isinstance(exp, EOFError):
-            print('Goodbye')
-            return
         try:
+            exp = read_expression()
+            if isinstance(exp, EOFError):
+                print('Goodbye')
+                return
             result = evaluate(exp)
             if result is not None:
                 print(stringify(result, True))

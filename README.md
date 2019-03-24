@@ -196,11 +196,11 @@ For simplicity, this Scheme treats (`define` _v_ _e_) as an expression type.
 `(globals)` returns a list of keys of the global environment.
 It is not in the standard.
 
-See [`GLOBAL_ENV`](scm.py#L169-L195)
+See [`GLOBAL_ENV`](scm.py#L168-L194)
 in `scm.py` for the implementation of the procedures
 except `call/cc` and `apply`.  
 `call/cc` and `apply` are implemented particularly at 
-[`apply_function`](scm.py#L290-L318) in `scm.py`.
+[`apply_function`](scm.py#L289-L317) in `scm.py`.
 
 I hope this serves as a popular model of how to write a Scheme interpreter
 in Python.

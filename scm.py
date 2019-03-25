@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-A little Scheme in Python 2.7/3.7 v3.0 H31.01.13/H31.03.24 by SUZUKI Hisao
+A little Scheme in Python 2.7/3.7 v3.0 H31.01.13/H31.03.25 by SUZUKI Hisao
 """
 from __future__ import print_function
 from sys import argv, exit
@@ -10,7 +10,7 @@ try:
 except ImportError:
     pass                        # for Python 2.7
 
-class List:
+class List (object):
     "Empty list"
     __slots__ = ()
 
@@ -69,7 +69,7 @@ class SchemeString:
         return '"' + self.string + '"'
 
 
-class Environment:
+class Environment (object):
     "Linked list of bindings mapping symbols to values"
     __slots__ = ('sym', 'val', 'next')
 
@@ -103,14 +103,14 @@ class Environment:
             return Environment(symbols.car, data.car,
                                self.prepend_defs(symbols.cdr, data.cdr))
 
-class Closure:
+class Closure (object):
     "Lambda expression with its environment"
     __slots__ = ('params', 'body', 'env')
 
     def __init__(self, params, body, env):
         self.params, self.body, self.env = params, body, env
 
-class Intrinsic:
+class Intrinsic (object):
     "Built-in function"
     __slots__ = ('name', 'arity', 'fun')
 

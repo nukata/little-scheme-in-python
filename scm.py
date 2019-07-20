@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-A little Scheme in Python 2.7/3.7 v3.0 H31.01.13/H31.03.25 by SUZUKI Hisao
+A little Scheme in Python 2.7/3.7 v3.1 H31.01.13/R01.07.20 by SUZUKI Hisao
 """
 from __future__ import print_function
 from sys import argv, exit
@@ -38,7 +38,7 @@ NOCONT = ()                   # NOCONT means there is no continuation.
 THEN = intern('then')
 APPLY_FUN = intern('aplly-fun')
 EVAL_ARG = intern('eval-arg')
-PUSH_ARGS = intern('push-args')
+CONS_ARGS = intern('push-args')
 RESTORE_ENV = intern('restore-env')
 
 class Cell (List):
@@ -164,6 +164,14 @@ def _globals(x):
         j = Cell(e.sym, j)
     return j
 
+def _error(x):
+    "Based on SRFI-23"
+    raise ErrorException("Error: %s: %s" % (stringify(x.car, False),
+                                            stringify(x.cdr.car)))
+
+class ErrorException (Exception):
+    pass
+
 _ = lambda n, a, f, next: Environment(intern(n), Intrinsic(n, a, f), next)
 GLOBAL_ENV = (
     _('display', 1, lambda x: print(stringify(x.car, False), end=''),
@@ -176,8 +184,9 @@ GLOBAL_ENV = (
                   _('*', 2, lambda x: x.car * x.cdr.car,
                     _('<', 2, lambda x: x.car < x.cdr.car,
                       _('=', 2, lambda x: x.car == x.cdr.car,
-                        _('globals', 0, _globals,
-                          None))))))))))))
+                        _('error', 2, _error,
+                          _('globals', 0, _globals,
+                            None)))))))))))))
 GLOBAL_ENV = Environment(
     None, None,                 # marker of the frame top
     _('car', 1, lambda x: x.car.car,
@@ -262,13 +271,13 @@ def evaluate(exp, env=GLOBAL_ENV):
                             k = (EVAL_ARG, x.car, k)
                             x = x.cdr
                         exp = x.car
-                        k = (PUSH_ARGS, NIL, k)
+                        k = (CONS_ARGS, NIL, k)
                         break
-                elif op is PUSH_ARGS: # x = evaluated args
+                elif op is CONS_ARGS: # x = evaluated args
                     args = Cell(exp, x)
                     op, exp, k = k
                     if op is EVAL_ARG: # exp = the next arg
-                        k = (PUSH_ARGS, args, k)
+                        k = (CONS_ARGS, args, k)
                         break
                     elif op is APPLY_FUN: # exp = evaluated fun
                         exp, k, env = apply_function(exp, args, k, env)
@@ -280,6 +289,8 @@ def evaluate(exp, env=GLOBAL_ENV):
                 else:
                     raise RuntimeError('bad op: %s: %s' %
                                        (stringify(op), stringify(x)))
+    except ErrorException:
+        raise
     except Exception as ex:
         msg = type(ex).__name__ + ': ' + str(ex)
         if k is not NOCONT:

@@ -1,12 +1,16 @@
 # A Little Scheme in Python
 
-This is a small (≈ 400 lines) interpreter of a subset of Scheme.
+This is a small (440 lines) interpreter of a subset of Scheme.
 It runs on both Python 2.7 and Python 3.7.
+It implements the same language as
+[little-scheme](https://github.com/nukata/little-scheme).
+
 As a Scheme implementation, 
 it optimizes _tail calls_ and handles _first-class continuations_ properly.
 
 The implementation has been revised along with
-[little-scheme-in-go](https://github.com/nukata/little-scheme-in-go).
+[little-scheme-in-go](https://github.com/nukata/little-scheme-in-go)
+since v3.0.
 See [`archived`](archived) folder for the previous implementation.
 
 
@@ -78,16 +82,19 @@ $ ./scm.py examples/fib90.scm -
 
 ## Examples
 
-There are four files under the `examples` folder.
+There are five files under the `examples` folder.
 
 - [`fib90.scm`](examples/fib90.scm)
   calculates Fibonacci for 90 tail-recursively.
 
 - [`nqueens.scm`](examples/nqueens.scm)
-  runs an N-Queens solver for 6.
+  solves N-Queens for 6.
 
 - [`dynamic-wind-example.scm`](examples/dynamic-wind-example.scm)
   demonstrates the example of `dynamic-wind` in R5RS.
+
+- [`amb.scm`](examples/amb.scm)
+  demonstrates a non-deterministic evaluation with `call/cc`.
 
 - [`yin-yang-puzzle.scm`](examples/yin-yang-puzzle.scm)
   runs the yin-yang puzzle with `call/cc`.
@@ -95,8 +102,10 @@ There are four files under the `examples` folder.
 ```
 $ ./scm.py examples/nqueens.scm
 ((5 3 1 6 4 2) (4 1 5 2 6 3) (3 6 2 5 1 4) (2 4 6 1 3 5))
-$ ./scm.py examples/dynamic-wind-example.scm 
+$ ./scm.py examples/dynamic-wind-example.scm
 (connect talk1 disconnect connect talk2 disconnect)
+$ ./scm.py examples/amb.scm
+((1 A) (1 B) (1 C) (2 A) (2 B) (2 C) (3 A) (3 B) (3 C))
 $ cat examples/yin-yang-puzzle.scm
 ;; The yin-yang puzzle 
 ;; cf. https://en.wikipedia.org/wiki/Call-with-current-continuation
@@ -130,9 +139,16 @@ $ ./scm.py examples/yin-yang-puzzle.scm
 
 Press the interrupt key (e.g. Control-C) to stop the yin-yang puzzle.
 
-For a large example, try
-[little-scheme](https://github.com/nukata/little-scheme),
-which is a meta-circular interpreter of this Scheme.
+You can also run
+[little-scheme](https://github.com/nukata/little-scheme) with `scm.py`.
+It is a meta-circular interpreter of this Scheme.
+If you have downloaded it as `../little-scheme`:
+
+```
+$ ./scm.py ../little-scheme/scm.scm < examples/amb.scm
+((1 A) (1 B) (1 C) (2 A) (2 B) (2 C) (3 A) (3 B) (3 C))
+$ 
+```
 
 
 ## The implemented language
@@ -149,12 +165,12 @@ which is a meta-circular interpreter of this Scheme.
 | closures `(lambda (x) (+ x 1))`     | `class Closure`                     |
 | built-in procedures `car`, `cdr`    | `class Intrinsic`                   |
 
-Continuations are represented by Python tuples of the form
-(_operation_, _value_, _next continuation_)
-and will be passed by `call/cc` to its argument.
+- Continuations are represented by Python tuples of the form
+  (_operation_, _value_, _next continuation_)
+  and will be passed by `call/cc` to its argument.
 
-Python's native string type `str` has `intern` function.
-It is reasonable to use it as Scheme's symbol type.
+- Python's native string type `str` has `intern` function.
+  It is reasonable to use it as Scheme's symbol type.
 
 
 ### Expression types
@@ -182,25 +198,29 @@ For simplicity, this Scheme treats (`define` _v_ _e_) as an expression type.
 
 ### Built-in procedures
 
-|                      |                       |                     |
-|:---------------------|:----------------------|:--------------------|
-| (`car` _lst_)        | (`not` _x_)           | (`eof-object?` _x_) |
-| (`cdr` _lst_)        | (`list` _x_ ...)      | (`symbol?` _x_)     |
-| (`cons` _x_ _y_)     | (`call/cc` _fun_)     | (`+` _x_ _y_)       |
-| (`eq?` _x_ _y_)      | (`apply` _fun_ _arg_) | (`-` _x_ _y_)       |
-| (`eqv?` _x_ _y_)     | (`display` _x_)       | (`*` _x_ _y_)       |
-| (`pair?` _x_)        | (`newline`)           | (`<` _x_ _y_)       |
-| (`null?` _x_)        | (`read`)              | (`=` _x_ _y_)       |
-|                      |                       | (`globals`)         |
+|                      |                          |                     |
+|:---------------------|:-------------------------|:--------------------|
+| (`car` _lst_)        | (`not` _x_)              | (`eof-object?` _x_) |
+| (`cdr` _lst_)        | (`list` _x_ ...)         | (`symbol?` _x_)     |
+| (`cons` _x_ _y_)     | (`call/cc` _fun_)        | (`+` _x_ _y_)       |
+| (`eq?` _x_ _y_)      | (`apply` _fun_ _arg_)    | (`-` _x_ _y_)       |
+| (`eqv?` _x_ _y_)     | (`display` _x_)          | (`*` _x_ _y_)       |
+| (`pair?` _x_)        | (`newline`)              | (`<` _x_ _y_)       |
+| (`null?` _x_)        | (`read`)                 | (`=` _x_ _y_)       |
+|                      | (`error` _reason_ _arg_) | (`globals`)         |
 
-`(globals)` returns a list of keys of the global environment.
-It is not in the standard.
+- `(error` _reason_ _arg_`)` raises an exception with the message
+  "`Error:` _reason_`:` _arg_".
+  It is based on [SRFI-23](https://srfi.schemers.org/srfi-23/srfi-23.html).
 
-See [`GLOBAL_ENV`](scm.py#L168-L194)
+- `(globals)` returns a list of keys of the global environment.
+  It is not in the standard.
+
+See [`GLOBAL_ENV`](scm.py#L176-L203)
 in `scm.py` for the implementation of the procedures
 except `call/cc` and `apply`.  
 `call/cc` and `apply` are implemented particularly at 
-[`apply_function`](scm.py#L289-L317) in `scm.py`.
+[`apply_function`](scm.py#L300-L328) in `scm.py`.
 
 I hope this serves as a popular model of how to write a Scheme interpreter
 in Python.

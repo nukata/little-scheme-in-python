@@ -1,14 +1,15 @@
 #!/usr/bin/env python
 """
-A little Scheme in Python 2.7/3.7 v3.1 H31.01.13/R01.07.20 by SUZUKI Hisao
+A Little Scheme in Python 2.7/3.8, v3.2 H31.01.13/R02.04.09 by SUZUKI Hisao
 """
 from __future__ import print_function
 from sys import argv, exit
 try:
-    from sys import intern      # for Python 3.7
-    raw_input = input           # for Python 3.7
+    from sys import intern      # for Python 3
+    raw_input = input           # for Python 3
+    long = int                  # for Python 3
 except ImportError:
-    pass                        # for Python 2.7
+    pass
 
 class List (object):
     "Empty list"
@@ -24,22 +25,6 @@ class List (object):
         return n
 
 NIL = List()
-QUOTE = intern('quote')         # Use an interned string as a symbol.
-IF = intern('if')
-BEGIN = intern('begin')
-LAMBDA = intern('lambda')
-DEFINE = intern('define')
-SETQ = intern('set!')
-APPLY = intern('apply')
-CALLCC = intern('call/cc')
-
-NOCONT = ()                   # NOCONT means there is no continuation.
-# Continuation operators
-THEN = intern('then')
-APPLY_FUN = intern('aplly-fun')
-EVAL_ARG = intern('eval-arg')
-CONS_ARGS = intern('push-args')
-RESTORE_ENV = intern('restore-env')
 
 class Cell (List):
     "Cons cell"
@@ -59,6 +44,34 @@ class Cell (List):
 
 class ImproperListError (Exception):
     pass
+
+QUOTE = intern('quote')         # Use an interned string as a symbol.
+IF = intern('if')
+BEGIN = intern('begin')
+LAMBDA = intern('lambda')
+DEFINE = intern('define')
+SETQ = intern('set!')
+APPLY = intern('apply')
+CALLCC = intern('call/cc')
+
+NOCONT = ()                   # NOCONT means there is no continuation.
+# Continuation operators
+THEN = intern('then')
+APPLY_FUN = intern('aplly-fun')
+EVAL_ARG = intern('eval-arg')
+CONS_ARGS = intern('cons-args')
+RESTORE_ENV = intern('restore-env')
+
+class ApplyClass:
+    def __str__(self):
+        return '#<apply>'
+
+class CallCcClass:
+    def __str__(self):
+        return '#<call/cc>'
+
+APPLY_OBJ = ApplyClass()
+CALLCC_OBJ = CallCcClass()
 
 class SchemeString:
     "String in Scheme"
@@ -173,34 +186,39 @@ class ErrorException (Exception):
     pass
 
 _ = lambda n, a, f, next: Environment(intern(n), Intrinsic(n, a, f), next)
+
+GLOBAL_ENV = (
+    _('+', 2, lambda x: x.car + x.cdr.car,
+      _('-', 2, lambda x: x.car - x.cdr.car,
+        _('*', 2, lambda x: x.car * x.cdr.car,
+          _('<', 2, lambda x: x.car < x.cdr.car,
+            _('=', 2, lambda x: x.car == x.cdr.car,
+              _('number?', 1, lambda x: isinstance(x.car, (int, float, long)),
+                _('error', 2, _error,
+                  _('globals', 0, _globals,
+                    None)))))))))
+
 GLOBAL_ENV = (
     _('display', 1, lambda x: print(stringify(x.car, False), end=''),
       _('newline', 0, lambda x: print(),
         _('read', 0, lambda x: read_expression('', ''),
           _('eof-object?', 1, lambda x: isinstance(x.car, EOFError),
             _('symbol?', 1, lambda x: isinstance(x.car, str),
-              _('+', 2, lambda x: x.car + x.cdr.car,
-                _('-', 2, lambda x: x.car - x.cdr.car,
-                  _('*', 2, lambda x: x.car * x.cdr.car,
-                    _('<', 2, lambda x: x.car < x.cdr.car,
-                      _('=', 2, lambda x: x.car == x.cdr.car,
-                        _('error', 2, _error,
-                          _('globals', 0, _globals,
-                            None)))))))))))))
+              Environment(CALLCC, CALLCC_OBJ,
+                          Environment(APPLY, APPLY_OBJ,
+                                      GLOBAL_ENV))))))))
+
 GLOBAL_ENV = Environment(
     None, None,                 # marker of the frame top
     _('car', 1, lambda x: x.car.car,
       _('cdr', 1, lambda x: x.car.cdr,
         _('cons', 2, lambda x: Cell(x.car, x.cdr.car),
           _('eq?', 2, lambda x: x.car is x.cdr.car,
-            _('eqv?', 2, lambda x: x.car == x.cdr.car,
-              _('pair?', 1, lambda x: isinstance(x.car, Cell),
-                _('null?', 1, lambda x: x.car is NIL,
-                  _('not', 1, lambda x: x.car is False,
-                    _('list', -1, lambda x: x,
-                      Environment(CALLCC, CALLCC,
-                                  Environment(APPLY, APPLY,
-                                              GLOBAL_ENV))))))))))))
+            _('pair?', 1, lambda x: isinstance(x.car, Cell),
+              _('null?', 1, lambda x: x.car is NIL,
+                _('not', 1, lambda x: x.car is False,
+                  _('list', -1, lambda x: x,
+                    GLOBAL_ENV)))))))))
 
 
 def evaluate(exp, env=GLOBAL_ENV):
@@ -302,10 +320,10 @@ def apply_function(fun, arg, k, env):
     It returns (result, continuation, environment).
     """
     while True:
-        if fun is CALLCC:
+        if fun is CALLCC_OBJ:
             k = _push_RESTORE_ENV(k, env)
             fun, arg = arg.car, Cell(k, NIL)
-        elif fun is APPLY:
+        elif fun is APPLY_OBJ:
             fun, arg = arg.car, arg.cdr.car
         else:
             break
